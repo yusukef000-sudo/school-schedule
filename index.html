@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>帰宅タイマー - 2年まつぐみ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 家族コード入力画面 -->
+  <div id="join-screen" class="join-screen">
+    <div class="join-card">
+      <h1>🏠 帰宅タイマー</h1>
+      <p class="join-subtitle">家族で共有するスケジュール管理</p>
+      <div class="join-form">
+        <label for="family-code-input">家族コードを入力</label>
+        <input type="text" id="family-code-input" placeholder="例: matsugumi2026"
+               maxlength="20" autocomplete="off" spellcheck="false">
+        <button class="join-btn" onclick="joinFamily()">参加する</button>
+        <div class="join-divider"><span>または</span></div>
+        <button class="create-btn" onclick="createFamily()">新しい家族コードを作成</button>
+      </div>
+      <p id="join-error" class="join-error"></p>
+    </div>
+  </div>
+
+  <!-- メイン画面 -->
+  <div id="main-app" class="container" style="display:none;">
+    <header>
+      <h1>🏠 帰宅タイマー</h1>
+      <p class="subtitle">2年まつぐみ 時間わり</p>
+      <div class="family-info">
+        <span id="family-code-display" class="family-code-badge"></span>
+        <span id="sync-status" class="sync-status">🔄 同期中...</span>
+        <button class="leave-btn" onclick="leaveFamily()">退出</button>
+      </div>
+    </header>
+
+    <section id="today-card" class="today-card">
+      <div class="today-header">
+        <span id="today-date" class="today-date"></span>
+        <span id="today-day" class="today-day"></span>
+      </div>
+      <div class="today-body">
+        <div class="info-row">
+          <span class="label">最終授業</span>
+          <span id="today-last-period" class="value"></span>
+        </div>
+        <div class="info-row">
+          <span class="label">下校時刻</span>
+          <span id="today-dismiss" class="value"></span>
+        </div>
+        <div class="info-row highlight">
+          <span class="label">🏠 帰宅予想</span>
+          <span id="today-arrival" class="value big"></span>
+        </div>
+        <div class="info-row">
+          <span class="label">⏰ あと</span>
+          <span id="today-countdown" class="value countdown"></span>
+        </div>
+        <div id="weekend-msg" class="weekend-msg" style="display:none;">
+          今日はお休みです 🎉
+        </div>
+      </div>
+      <button id="notify-btn" class="notify-btn" onclick="requestNotification()">
+        🔔 帰宅15分前に通知する
+      </button>
+      <div id="notify-status" class="notify-status"></div>
+    </section>
+
+    <section class="override-section">
+      <h2>📝 時間割変更（家族で共有）</h2>
+      <p class="override-desc">変更すると家族全員の画面に即反映されます</p>
+      <div class="override-form">
+        <div class="override-row">
+          <label for="override-date">日付</label>
+          <input type="date" id="override-date">
+        </div>
+        <div class="override-row">
+          <label>何時間授業？</label>
+          <div class="period-selector">
+            <button class="period-btn" data-periods="3" onclick="selectPeriod(3)">3時間</button>
+            <button class="period-btn" data-periods="4" onclick="selectPeriod(4)">4時間</button>
+            <button class="period-btn" data-periods="5" onclick="selectPeriod(5)">5時間</button>
+            <button class="period-btn" data-periods="6" onclick="selectPeriod(6)">6時間</button>
+          </div>
+        </div>
+        <div class="override-row">
+          <label>下校時刻（自動計算）</label>
+          <span id="override-dismiss" class="override-dismiss-display">-</span>
+        </div>
+        <div class="override-row">
+          <label>帰宅予想</label>
+          <span id="override-arrival" class="override-arrival-display">-</span>
+        </div>
+        <button class="save-btn" onclick="saveOverride()">この変更を登録</button>
+      </div>
+      <div id="override-list-container">
+        <h3>登録済みの変更</h3>
+        <div id="override-list"></div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h2>⚙️ 通学時間の設定</h2>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label for="walk-time">🚶 学校→駅（徒歩）</label>
+          <div class="input-group">
+            <input type="number" id="walk-time" value="15" min="0" max="60">
+            <span>分</span>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label for="train-time">🚃 電車</label>
+          <div class="input-group">
+            <input type="number" id="train-time" value="20" min="0" max="120">
+            <span>分</span>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label for="transfer-time">🔄 乗り換え</label>
+          <div class="input-group">
+            <input type="number" id="transfer-time" value="5" min="0" max="30">
+            <span>分</span>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label for="notify-before">🔔 通知（帰宅の何分前）</label>
+          <div class="input-group">
+            <input type="number" id="notify-before" value="15" min="0" max="60">
+            <span>分前</span>
+          </div>
+        </div>
+      </div>
+      <button class="save-btn" onclick="saveSettings()">設定を保存</button>
+    </section>
+
+    <section class="timetable-section">
+      <h2>📅 週間時間割</h2>
+      <div class="timetable-wrapper">
+        <table class="timetable" id="timetable">
+          <thead>
+            <tr>
+              <th></th>
+              <th>月</th>
+              <th>火</th>
+              <th>水</th>
+              <th>木</th>
+              <th>金</th>
+            </tr>
+          </thead>
+          <tbody id="timetable-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="weekly-summary">
+      <h2>📊 今週の帰宅予想</h2>
+      <div class="summary-cards" id="weekly-cards"></div>
+    </section>
+  </div>
+
+  <!-- Firebase SDK (CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
