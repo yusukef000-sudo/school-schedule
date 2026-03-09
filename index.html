@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>帰宅タイマー - 2年まつぐみ</title>
+  <title>帰宅タイマー</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -48,7 +48,7 @@
           <span id="today-last-period" class="value"></span>
         </div>
         <div class="info-row">
-          <span class="label">下校時刻</span>
+          <span class="label">🏫 学校出発</span>
           <span id="today-dismiss" class="value"></span>
         </div>
         <div class="info-row highlight">
@@ -87,11 +87,18 @@
           </div>
         </div>
         <div class="override-row">
-          <label>下校時刻（自動計算）</label>
+          <label>🏫 学校出発（自動計算）</label>
           <span id="override-dismiss" class="override-dismiss-display">-</span>
         </div>
+        <div class="override-row override-custom-row">
+          <label for="override-custom-time">✏️ 出発時刻を直接指定</label>
+          <div class="input-group">
+            <input type="time" id="override-custom-time" onchange="onCustomTimeChange()">
+            <button class="clear-custom-btn" onclick="clearCustomTime()">クリア</button>
+          </div>
+        </div>
         <div class="override-row">
-          <label>帰宅予想</label>
+          <label>🏠 帰宅予想</label>
           <span id="override-arrival" class="override-arrival-display">-</span>
         </div>
         <button class="save-btn" onclick="saveOverride()">この変更を登録</button>
