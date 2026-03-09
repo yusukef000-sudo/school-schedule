@@ -20,11 +20,16 @@ const TIMETABLE = {
   dayNames: ['月', '火', '水', '木', '金'],
 };
 
-const DISMISSAL_BY_PERIODS = {
-  3: '11:30',
-  4: '12:20',
-  5: '14:10',
-  6: '15:00',
+// 時間目数 → 学校出発時刻のマッピング
+// 3時間: 11:20終了 + HR20分 = 11:40
+// 4時間: 12:10終了 + 昼食(12:40) + 掃除(12:55) + HR20分 = 13:15
+// 5時間: 14:00終了 + HR20分 = 14:20
+// 6時間: 14:50終了 + HR20分 = 15:10
+const DEPARTURE_BY_PERIODS = {
+  3: '11:40',
+  4: '13:15',
+  5: '14:20',
+  6: '15:10',
 };
 
 // ===== 状態管理 =====
@@ -154,32 +159,57 @@ function selectPeriod(num) {
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.periods) === num);
   });
+  // 時間数を選んだらカスタム時刻をクリア
+  document.getElementById('override-custom-time').value = '';
   updateOverridePreview();
+}
+
+function onCustomTimeChange() {
+  // カスタム時刻を入力したらプレビュー更新
+  updateOverridePreview();
+}
+
+function clearCustomTime() {
+  document.getElementById('override-custom-time').value = '';
+  updateOverridePreview();
+}
+
+function getOverrideDeparture() {
+  const customTime = document.getElementById('override-custom-time').value;
+  if (customTime) return customTime;
+  if (selectedOverridePeriods) return DEPARTURE_BY_PERIODS[selectedOverridePeriods];
+  return null;
 }
 
 function updateOverridePreview() {
   const dismissEl = document.getElementById('override-dismiss');
   const arrivalEl = document.getElementById('override-arrival');
-  if (!selectedOverridePeriods) {
+  const departure = getOverrideDeparture();
+  if (!departure) {
     dismissEl.textContent = '-';
     arrivalEl.textContent = '-';
     return;
   }
-  const dismiss = DISMISSAL_BY_PERIODS[selectedOverridePeriods];
-  dismissEl.textContent = dismiss;
-  arrivalEl.textContent = addMinutes(dismiss, getCommuteMinutes());
+  dismissEl.textContent = departure;
+  arrivalEl.textContent = addMinutes(departure, getCommuteMinutes());
 }
 
 function saveOverride() {
   const dateStr = document.getElementById('override-date').value;
   if (!dateStr) { alert('日付を選択してください'); return; }
-  if (!selectedOverridePeriods) { alert('何時間授業か選択してください'); return; }
   if (getDayIndexForDate(dateStr) === -1) { alert('土日は登録できません'); return; }
 
-  const dismiss = DISMISSAL_BY_PERIODS[selectedOverridePeriods];
-  overridesCache[dateStr] = { periods: selectedOverridePeriods, dismissal: dismiss };
+  const customTime = document.getElementById('override-custom-time').value;
+  const departure = getOverrideDeparture();
 
-  // Firebaseに保存（リアルタイムで全員に反映）
+  if (!departure) { alert('時間数を選択するか、出発時刻を入力してください'); return; }
+
+  overridesCache[dateStr] = {
+    periods: selectedOverridePeriods || null,
+    dismissal: departure,
+    customTime: customTime || null,
+  };
+
   if (currentFamilyCode) {
     getOverridesRef().set(overridesCache);
     updateSyncStatus('🔄 保存中...');
@@ -190,6 +220,7 @@ function saveOverride() {
   document.querySelectorAll('.period-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('override-dismiss').textContent = '-';
   document.getElementById('override-arrival').textContent = '-';
+  document.getElementById('override-custom-time').value = '';
 }
 
 function deleteOverride(dateStr) {
@@ -215,11 +246,15 @@ function renderOverrideList() {
     const dayName = TIMETABLE.dayNames[getDayIndexForDate(dateStr)];
     const displayDate = `${d.getMonth() + 1}/${d.getDate()}（${dayName}）`;
     const arrival = addMinutes(ov.dismissal, getCommuteMinutes());
+    const detail = ov.customTime
+      ? `出発 ${ov.customTime}`
+      : ov.periods ? `${ov.periods}時間授業` : `出発 ${ov.dismissal}`;
+    const customLabel = ov.customTime ? ' <span class="override-item-custom">✏️手動</span>' : '';
     html += `
       <div class="override-item">
         <div class="override-item-info">
           <span class="override-item-date">${displayDate}</span>
-          <span class="override-item-detail">${ov.periods}時間授業</span>
+          <span class="override-item-detail">${detail}${customLabel}</span>
           <span class="override-item-arrival">→ 帰宅 ${arrival}</span>
         </div>
         <button class="override-delete-btn" onclick="deleteOverride('${dateStr}')" aria-label="削除">✕</button>
@@ -303,7 +338,9 @@ function getDismissalTime(dayIndex, dateStr) {
     const ov = getOverrideForDate(dateStr);
     if (ov) return ov.dismissal;
   }
-  return TIMETABLE.dismissal[dayIndex];
+  // 通常: 最終授業の時間数から出発時刻を算出
+  const lastPeriod = getLastPeriod(dayIndex);
+  return DEPARTURE_BY_PERIODS[lastPeriod] || TIMETABLE.dismissal[dayIndex];
 }
 
 function getEffectiveLastPeriod(dayIndex, dateStr) {
